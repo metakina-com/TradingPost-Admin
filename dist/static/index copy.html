@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" http-equiv="Access-Control-Allow-Origin" content="*">
+    <link rel="stylesheet" type="text/css" href="./layer/theme/default/layer.css">
+    <!-- 引入 JQuery 文件 -->
+    <script src="http://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script>
+    <script src="./layer/layer.js"></script>
+    <!-- 引入 ECharts 文件 -->
+    <script crossorigin="anonymous" integrity="sha384-et+fqdf7kslHL5Ip8rXSJPUPODLa7eMfpFTBaCfnlMzrcAz/wxI5Xm/mNTZwd+7H"
+        src="https://lib.baomitu.com/echarts/4.7.0/echarts.min.js"></script>
+
+    <style>
+        #echarts-menu {
+            display: none;
+            position: absolute;
+            background: #f0f0f0;
+            width: 15rem;
+            /* height: 6rem; */
+            padding: 1rem;
+            background: #fff;
+            border: 3px solid #f0f0f0;
+            box-shadow: 3px 4px 15px 8px #afafaf;
+        }
+
+        .menu-text {
+            padding: .3rem 0;
+            font-size: 20px;
+
+        }
+
+        .menu-text span {
+            color: #FF9800;
+            font-weight: bold;
+        }
+
+        .menu-btn {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .menu-btn button {
+            padding: .5rem 1rem;
+            background: #3fa2e8;
+            color: #fff;
+            border-radius: .5rem;
+            border-color: #3fa2e8;
+        }
+
+        #upgrade {
+            background: #ff9800;
+            border-color: #ff9800;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 为 ECharts 准备一个具备大小（宽高）的 DOM -->
+    <div id="main" style="width: width%; height:100vh;"></div>
+    <div id="echarts-menu"></div>
+    <script type="text/javascript">
+        function getQueryVariable(variable)
+        {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+            if(pair[0] == variable){return pair[1];}
+                }
+            return(false);
+        }
+        var phone=getQueryVariable("phone") ;
+        
+        $("#main").bind("contextmenu", function (e) { return false; }); // 防止默认菜单弹出
+        $(document).click(function () { $("#echarts-menu").hide(); });
+        ROOT_PATH = "https://api.euronextex.com/admin/sysAdmin"
+        // 基于准备好的dom，初始化echarts实例
+        var myChart = echarts.init(document.getElementById('main'));
+        var options = {}
+        myChart.showLoading();
+        $.getJSON(ROOT_PATH + '/welMembers?phone='+phone, function (data) {
+            myChart.hideLoading();
+            var data = data.result
+            var dataArr = []
+            for (let i = 0; i < data.length; i++) {
+                dataArr.push({
+                    name: data[i].phone,
+                    value: data[i].balance,
+                    id: data[i].id,
+                    children: []
+                })
+            }
+            var data = {
+                "name": "顶级用户",
+                "children": dataArr
+            }
+            options = {
+                
+                tooltip: {
+                    trigger: 'item',
+                    triggerOn: 'mousemove',
+                    formatter: '资产(MEP):{c}'
+                },
+                series: [
+                    {
+                        type: 'tree',
+                        data: [data],
+                        left: '2%',
+                        right: '2%',
+                        top: '8%',
+                        bottom: '20%',
+                        symbolSize: [50, 50],
+                        edgeShape: 'polyline',
+                        edgeForkPosition: '50%',
+                        roam: true,
+                        expandAndCollapse: false,
+                        initialTreeDepth: 1,
+                        itemStyle: {
+                            color: "#6ECDCF",
+                            borderColor: '#6ECDCF',
+                        },
+                        label: {
+                            position: 'inside',
+                            rotate: 0,
+                            verticalAlign: 'middle',
+                            align: 'right',
+                            fontSize: 9,
+                            align: "center",
+                            color: "#888",
+                            fontWeight: "bold",
+                            fontSize: 14
+                        },
+                        // 页子节点配置
+                        leaves: {
+                            label: {
+                                position: 'bottom',
+                                rotate: 0,
+                                offset: [0,10],
+                                verticalAlign: 'middle',
+                                align: 'center'
+                            }
+                        },
+                        orient: 'vertical',
+                        expandAndCollapse: true,
+                        animationDurationUpdate: 750
+                    }
+                ]
+            }
+            myChart.setOption(options);
+        });
+
+        /**
+         * 点击加载子节点数据 
+         */
+        myChart.on('click', function (params) {
+            params.data.hasChild = false;
+            params.data.collapsed = false;
+
+            if (params.data.children.length <= 0) {
+                var id = params.data.id
+                // 1 ajax请求数据
+                $.getJSON(ROOT_PATH + '/getWelMembers?id=' + id, function (d) {
+                    var d = d.result
+                    // 数据去重
+                    if (d.length > 0) {
+                     
+                        //将数据push到当前data.children中
+                        for (let i = 0; i < d.length; i++) {
+                            params.data.children.push({
+                                name: d[i].phone,
+                                value: "电话:"+d[i].phone+"  MEP:"+d[i].balance,
+                                id: d[i].id,
+                                children: [],
+                            });
+                        }
+                        //获取新数据
+                        data = myChart.getOption().series[0].data;
+                        // 赋值操作
+                        options.series[0].data = data
+                        // console.log(data)
+                        // console.log(options.series[0].data)
+                        // console.log(options)
+                        // 重载数据
+                        myChart.setOption(options)
+                    } else {
+                        layer.msg('没有下级用户')
+                    }
+                })
+            } else {
+                if(params.data.name == '顶级用户')  {
+                   return false
+                } else {
+                    // console.log(params)
+                    params.data.children = []
+                }
+               
+            }
+        });
+        
+
+        // 科学计数金额转换
+        function toolNumber(num_str) {
+            num_str = num_str.toString();
+            if (num_str.indexOf("+") != -1) {
+                num_str = num_str.replace("+", "");
+            }
+            if (num_str.indexOf("E") != -1 || num_str.indexOf("e") != -1) {
+                var resValue = "",
+                    power = "",
+                    result = null,
+                    dotIndex = 0,
+                    resArr = [],
+                    sym = "";
+                var numStr = num_str.toString();
+                if (numStr[0] == "-") {
+                    //如果为负数，转成正数处理，先去掉‘-’号，并保存‘-’.
+                    numStr = numStr.substr(1);
+                    sym = "-";
+                }
+                if (numStr.indexOf("E") != -1 || numStr.indexOf("e") != -1) {
+                    var regExp = new RegExp(
+                        "^(((\\d+.?\\d+)|(\\d+))[Ee]{1}((-(\\d+))|(\\d+)))$",
+                        "ig"
+                    );
+                    result = regExp.exec(numStr);
+                    if (result != null) {
+                        resValue = result[2];
+                        power = result[5];
+                        result = null;
+                    }
+                    if (!resValue && !power) {
+                        return false;
+                    }
+                    dotIndex = resValue.indexOf(".") == -1 ? 0 : resValue.indexOf(".");
+                    resValue = resValue.replace(".", "");
+                    resArr = resValue.split("");
+                    if (Number(power) >= 0) {
+                        var subres = resValue.substr(dotIndex);
+                        power = Number(power);
+                        //幂数大于小数点后面的数字位数时，后面加0
+                        for (var i = 0; i <= power - subres.length; i++) {
+                            resArr.push("0");
+                        }
+                        if (power - subres.length < 0) {
+                            resArr.splice(dotIndex + power, 0, ".");
+                        }
+                    } else {
+                        power = power.replace("-", "");
+                        power = Number(power);
+                        //幂数大于等于 小数点的index位置, 前面加0
+                        for (let i = 0; i < power - dotIndex; i++) {
+                            resArr.unshift("0");
+                        }
+                        var n = power - dotIndex >= 0 ? 1 : -(power - dotIndex);
+                        resArr.splice(n, 0, ".");
+                    }
+                }
+                resValue = resArr.join("");
+                return sym + resValue;
+            } else {
+                return num_str;
+            }
+        }
+
+    </script>
+</body>
+
+</html>
